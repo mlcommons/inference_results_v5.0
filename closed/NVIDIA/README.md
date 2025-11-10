@@ -597,6 +597,13 @@ make generate_engines RUN_ARGS="--benchmarks=llama2-70b \
     --power_setting=<POWER_SETTING>\
     --harness_type=custom \
     --config_ver=<CONFIG_VERSION>"
+
+# Example:
+# make generate_engines RUN_ARGS="--benchmarks=llama2-70b \
+#     --scenarios=Offline \
+#     --power_setting=MaxQ \
+#     --harness_type=custom \
+#     --config_ver=high_accuracy_maxq"
 ```
 Triton Server Configuration (Worker Nodes)
 In each Triton inference server container, generate the corresponding Triton engine config:
@@ -609,6 +616,15 @@ make generate_triton_config RUN_ARGS="--benchmarks=llama2-70b\
     --engine_dir=${ENGINE_DIR} \
     --config_ver=<CONFIG_VERSION> \
     --verbose"
+
+# Example: 
+# make generate_triton_config RUN_ARGS="--benchmarks=llama2-70b \
+#     --scenarios=Offline \
+#     --harness_type=triton \
+#     --power_setting=MaxQ \
+#     --engine_dir=${ENGINE_DIR} \
+#     --config_ver=triton_high_accuracy_maxq \
+#     --verbose"
 ```
 
 3. Launch Triton Inference Servers
@@ -622,6 +638,16 @@ python3 /work/build/triton-inference-server/out/tensorrtllm/scripts/launch_trito
   --multi-model \
   --grpc_port=<GRPC_PORT> --http_port=<HTTP_PORT> --metrics_port=<METRICS_PORT> \
   --world_size=1
+
+# Example:
+# export NVIDIA_TRITON_SERVER_VERSION=24.12
+# python3 /work/build/triton-inference-server/out/tensorrtllm/scripts/launch_triton_server.py \
+#   --tritonserver=/opt/tritonserver/bin/tritonserver \
+#   --model_repo=/work/build/triton_model_repos/H200NVLx8/llama2-70b/offline/repo_0 \
+#   --tensorrt_llm_model_name=model-6,model-4,model-3,model-0,model-7,model-2,model-5,model-1 \
+#   --multi-model \
+#   --grpc_port=<GRPC_PORT> --http_port=<HTTP_PORT> --metrics_port=<METRICS_PORT> \
+#   --world_size=1
 ```
 4. Run the Harness
 
@@ -634,6 +660,15 @@ make run_harness RUN_ARGS='--benchmarks=llama2-70b \
   --power_setting=<POWER_SETTING> \
   --config_ver=<CONFIG_VERSION> \
   --triton_grpc_ports=<NODE1_IP>:<GRPC_PORT>|<NODE2_IP>:<GRPC_PORT>|...'
+
+# Example:
+# make run_harness RUN_ARGS='--benchmarks=llama2-70b \
+#   --scenarios=Offline \
+#   --harness_type=triton \
+#   --triton_skip_server_spawn \
+#   --power_setting=MaxQ \
+#   --config_ver=triton_high_accuracy_maxq \
+#   --triton_grpc_ports=192.168.100.1:44553\|192.168.100.2:44553'
 ```
 
 
