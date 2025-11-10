@@ -382,6 +382,50 @@ $ make run RUN_ARGS="--benchmarks=resnet50,bert --scenarios=offline,server"
 ```
 **If you run into issues, invalid results, or would like to improve your performance,** **read** `documentation/performance_tuning_guide.md`.
 
+### Multinode runs
+
+From within the container, installing the triton software:
+
+```
+$ make clone_triton && make build_triton
+```
+
+Generating the triton config files(after generating the engines):
+
+```
+$ make generate_triton_config RUN_ARGS="--benchmarks=llama2-70b \ #or other benchmarks
+ --scenarios=Offline \
+--harness_type=triton \
+--accuracy_target=0.999 \ # or 0.99
+--engine_dir=/path/to/engines \”
+```
+
+After modifying the `start_triton.sh` based on your specific node config, start the triton engines on each node:
+
+```
+$ /work/start_triton.sh
+```
+
+Keeping the engines running, enter one node's(considered the master node hereon) container from a different shell:
+
+```
+$ docker exec -it "image-name" bash
+```
+
+Start the accuracy/throughput runs through seperate triton-client frontends for each node:
+
+```
+$ make run_harness RUN_ARGS="\
+  --benchmarks=llama2-70b \ # or the other benchmarks
+  --scenarios=Offline \
+  --harness_type=triton \
+  --inference_server=triton \
+  --accuracy_target=0.999 \ # or 0.99
+  --triton_skip_server_spawn \
+  --triton_grpc_ports='ip_of_master_node:8001|ip_of_worker_node_1:8001|ip_of_worker_node_2:8001...'"
+```
+
+
 ### How do I run the accuracy checks?
 
 You can run the harness for accuracy checks using the `--test_mode=AccuracyOnly` flag:

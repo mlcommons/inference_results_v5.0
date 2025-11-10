@@ -41,7 +41,7 @@ class HopperOfflineGPUBaseConfig(OfflineGPUBaseConfig):
 
     trtllm_build_flags = {
         'tensor_parallelism': 1,
-        'pipeline_parallelism': 1,
+        'pipeline_parallelism': 2,
     }
 
 
@@ -54,10 +54,9 @@ class BlackwellOfflineGPUBaseConfig(OfflineGPUBaseConfig):
 
     trtllm_build_flags = {
         'tensor_parallelism': 1,
-        'pipeline_parallelism': 1,
+        'pipeline_parallelism': 2,
         'norm_quant_fusion': 'enable'
     }
-
 
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP)
 class GH200_144GB_aarch64x1(HopperOfflineGPUBaseConfig):
@@ -87,14 +86,12 @@ class GH200_144GB_aarch64x2(GH200_144GB_aarch64x1):
 class GH200_144GB_aarch64x2_HighAccuracy(GH200_144GB_aarch64x2):
     pass
 
-
-@ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP, "PP2")
 class H100_SXM_80GB_PP2x1(HopperOfflineGPUBaseConfig):
     system = KnownSystem.H100_SXM_80GBx2
     vboost_slider = 0
 
     gpu_batch_size = {'llama2-70b': 1024}
-    offline_expected_qps = 27.5
+    offline_expected_qps = 75
     trtllm_build_flags = {
         'max_num_tokens': 1024,
         'tensor_parallelism': 1,
@@ -117,7 +114,7 @@ class H100_SXM_80GB_Triton_PP2x1(HopperOfflineGPUBaseConfig):
     triton_num_frontends_per_model = 1
 
     gpu_batch_size = {'llama2-70b': 2048}
-    offline_expected_qps = 25
+    offline_expected_qps = 75
     trtllm_build_flags = {
         'max_num_tokens': 1024,
         'tensor_parallelism': 1,
@@ -125,13 +122,50 @@ class H100_SXM_80GB_Triton_PP2x1(HopperOfflineGPUBaseConfig):
     }
     trtllm_runtime_flags = {'max_num_tokens': 1024}
 
+@ConfigRegistry.register(
+    HarnessType.Custom,
+    AccuracyTarget.k_99_9,
+    PowerSetting.MaxP
+)
+class H100_SXM_80GB_Custom_HighAccuracy(H100_SXM_80GB_Triton_PP2x1):
+    system = KnownSystem.H100_SXM_80GBx1
+    use_triton = True
+    triton_num_clients_per_frontend = 1
+    triton_num_frontends_per_model = 1
+    gpu_batch_size = {'llama2-70b': 1024}
+    offline_expected_qps = 75
+    trtllm_build_flags = {
+        'max_num_tokens': 1024,
+        'tensor_parallelism': 1,
+        'pipeline_parallelism': 2,
+        'reduce_fusion': 'enable',
+        'gemm_swiglu_plugin': 'fp8',
+    }
+    trtllm_runtime_flags = {
+        'max_num_tokens': 1024,
+        'kvcache_free_gpu_mem_frac': 0.95,
+    }
+
+
+@ConfigRegistry.register(
+    HarnessType.Triton,
+    AccuracyTarget.k_99_9,      
+    PowerSetting.MaxP
+)
+class H100_SXM_80GB_Triton_PP2x1_HighAccuracy(H100_SXM_80GB_Triton_PP2x1):
+    pass
+@ConfigRegistry.register(
+    HarnessType.Custom,
+    AccuracyTarget.k_99_9,
+    PowerSetting.MaxP
+)
+class H100_SXM_80GB_Triton_PP2x1_HighAccuracy_CustomAlias(H100_SXM_80GB_Triton_PP2x1_HighAccuracy):
+    pass
 
 @ConfigRegistry.register(HarnessType.Triton, AccuracyTarget.k_99, PowerSetting.MaxP, "PP2")
 class H100_SXM_80GB_Triton_PP2x4(H100_SXM_80GB_Triton_PP2x1):
     system = KnownSystem.H100_SXM_80GBx8
     offline_expected_qps = 25 * 4
-
-
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP, "PP2")
 class H100_SXM_80GB_PP2x2(H100_SXM_80GB_PP2x1):
     system = KnownSystem.H100_SXM_80GBx4
@@ -182,21 +216,13 @@ class H100_NVL_94GB_TP2x1(HopperOfflineGPUBaseConfig):
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP, "TP2")
 class H100_NVL_94GB_TP2x2(H100_NVL_94GB_TP2x1):
     system = KnownSystem.H100_NVL_94GBx4
-    offline_expected_qps = 25
+    offline_expected_qps = 10
 
 
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxP, "TP2")
 class H100_NVL_94GB_TP2x4(H100_NVL_94GB_TP2x2):
     system = KnownSystem.H100_NVL_94GBx8
     offline_expected_qps = 50
-
-
-@ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99, PowerSetting.MaxQ, "TP2")
-class H100_NVL_94GB_MaxQ_TP2x4(H100_NVL_94GB_TP2x4):
-    offline_expected_qps = 45
-    power_limit = 350
-
-
 @ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP, "TP2")
 class H100_NVL_94GB_HighAccuracy_TP2x1(H100_NVL_94GB_TP2x1):
     pass
@@ -362,7 +388,34 @@ class B200_SXM_180GBx8(B200_SXM_180GBx1):
     system = KnownSystem.B200_SXM_180GBx8
     offline_expected_qps = B200_SXM_180GBx1.offline_expected_qps * 8
 
+@ConfigRegistry.register(
+    HarnessType.Triton,
+    AccuracyTarget.k_99,
+    PowerSetting.MaxP
+)
+class DGX_H100_H100_SXM_80GBx2_Triton(H100_SXM_80GB_Triton_PP2x1):
+    system = KnownSystem.H100_SXM_80GBx2
 
-@ConfigRegistry.register(HarnessType.Custom, AccuracyTarget.k_99_9, PowerSetting.MaxP)
-class B200_SXM_180GBx8_HighAccuracy(B200_SXM_180GBx8):
+@ConfigRegistry.register(
+    HarnessType.Triton,
+    AccuracyTarget.k_99_9,
+PowerSetting.MaxP
+)
+class DGX_H100_H100_SXM_80GBx2_Triton_HA(DGX_H100_H100_SXM_80GBx2_Triton):
+    pass
+
+@ConfigRegistry.register(
+    HarnessType.Triton,
+    AccuracyTarget.k_99,
+    PowerSetting.MaxP
+)
+class DGX_H100_H100_SXM_80GBx1_Triton(H100_SXM_80GB_Triton_PP2x1):
+    system = KnownSystem.H100_SXM_80GBx1
+
+@ConfigRegistry.register(
+    HarnessType.Triton,
+    AccuracyTarget.k_99_9,
+    PowerSetting.MaxP
+)
+class DGX_H100_H100_SXM_80GBx1_Triton_HA(DGX_H100_H100_SXM_80GBx1_Triton):
     pass
