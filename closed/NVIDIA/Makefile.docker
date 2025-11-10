@@ -105,7 +105,7 @@ ifneq ($(wildcard /usr/bin/nvidia-docker),)
     # Related issue: https://github.com/kubernetes-sigs/kubespray/issues/6160
     export DOCKER_API_VERSION=1.40
 else
-    DOCKER_RUN_CMD := docker run --runtime=nvidia
+    DOCKER_RUN_CMD := docker run --gpus=all
 endif
 
 # If specific DOCKER_COMMAND is not passed, launch interactive docker container session.
