@@ -568,6 +568,117 @@ $ make preprocess_data BENCHMARKS="resnet50 retinanet bert 3d-unet gptj llama2-7
 
 **Note**: the above steps (*Download the datasets, Downloading the model files, Preprocessing the datasets for inference*) are **not** guaranteed to work on Jetson-based system (e.g. Orin). It is suggested to run the steps on other cuda-enabled devices, and copy over the $(MLPERF_SCRATCH_PATH)/ directory if needed. If any target fails, please try to run it inside the container following *Launching the environment* section below.
 
+### Multinode Execution for Llama70b Inference
+
+For multinode runs, we implement a structure of one harness and multiple inference triton servers in docker containers. 
+
+1. Environment Setup
+
+After preparing the base environment (make prebuild), clone and build the required modules:
+```
+make link_dirs
+make clone_loadgen
+make clone_power_dev
+make clone_trt_llm
+make build_trt_llm
+make build_plugins
+make build_loadgen
+make build_harness
+make clone_triton && make build_triton
+```
+2. Generate Engine Configurations
+
+Harness Configuration (Controller Node)
+In the harness container, generate the configuration for the harness engine:
+```
+mkdir -p build/models/Llama2/fp8-quantized-modelopt
+make generate_engines RUN_ARGS="--benchmarks=llama2-70b \
+    --scenarios=<SCENARIO> \
+    --power_setting=<POWER_SETTING>\
+    --harness_type=custom \
+    --config_ver=<CONFIG_VERSION>"
+```
+Example:
+```
+make generate_engines RUN_ARGS="--benchmarks=llama2-70b \
+    --scenarios=Offline \
+    --power_setting=MaxQ \
+    --harness_type=custom \
+    --config_ver=high_accuracy_maxq"
+```
+Triton Server Configuration (Worker Nodes)
+In each Triton inference server container, generate the corresponding Triton engine config:
+```
+ENGINE_DIR=build/engines/<SYSTEM_NAME>/llama2-70b/<SCENARIO>/<ENGINE_PATH>
+make generate_triton_config RUN_ARGS="--benchmarks=llama2-70b\
+    --scenarios=<SCENARIO> \
+    --harness_type=triton \
+    --power_setting=<POWER_SETTING> \
+    --engine_dir=${ENGINE_DIR} \
+    --config_ver=<CONFIG_VERSION> \
+    --verbose"
+```
+
+Example: 
+```
+make generate_triton_config RUN_ARGS="--benchmarks=llama2-70b \
+    --scenarios=Offline \
+    --harness_type=triton \
+    --power_setting=MaxQ \
+    --engine_dir=${ENGINE_DIR} \
+    --config_ver=triton_high_accuracy_maxq \
+    --verbose"
+```
+
+3. Launch Triton Inference Servers
+On each worker node, launch the Triton server container sequentially (to avoid Docker conflicts):
+```
+export NVIDIA_TRITON_SERVER_VERSION=<TRITON_VERSION>
+python3 /work/build/triton-inference-server/out/tensorrtllm/scripts/launch_triton_server.py \
+  --tritonserver=/opt/tritonserver/bin/tritonserver \
+  --model_repo=/work/build/triton_model_repos/<SYSTEM_NAME>/llama2-70b/<SCENARIO>/repo_0 \
+  --tensorrt_llm_model_name=<MODEL_LIST> \
+  --multi-model \
+  --grpc_port=<GRPC_PORT> --http_port=<HTTP_PORT> --metrics_port=<METRICS_PORT> \
+  --world_size=1
+```
+
+Example:
+```
+export NVIDIA_TRITON_SERVER_VERSION=24.12
+python3 /work/build/triton-inference-server/out/tensorrtllm/scripts/launch_triton_server.py \
+  --tritonserver=/opt/tritonserver/bin/tritonserver \
+  --model_repo=/work/build/triton_model_repos/H200NVLx8/llama2-70b/offline/repo_0 \
+  --tensorrt_llm_model_name=model-6,model-4,model-3,model-0,model-7,model-2,model-5,model-1 \
+  --multi-model \
+  --grpc_port=<GRPC_PORT> --http_port=<HTTP_PORT> --metrics_port=<METRICS_PORT> \
+  --world_size=1
+```
+
+4. Run the Harness
+
+In the controller (harness) container, run the harness process to connect to all Triton servers:
+```
+make run_harness RUN_ARGS='--benchmarks=llama2-70b \
+  --scenarios=<SCENARIO> \
+  --harness_type=triton \
+  --triton_skip_server_spawn \
+  --power_setting=<POWER_SETTING> \
+  --config_ver=<CONFIG_VERSION> \
+  --triton_grpc_ports=<NODE1_IP>:<GRPC_PORT>|<NODE2_IP>:<GRPC_PORT>|...'
+```
+
+Example:
+```
+make run_harness RUN_ARGS='--benchmarks=llama2-70b \
+    --scenarios=Offline \
+    --harness_type=triton \
+    --triton_skip_server_spawn \
+    --power_setting=MaxQ \
+    --config_ver=triton_high_accuracy_maxq \
+    --triton_grpc_ports=192.168.100.1:44553\|192.168.100.2:44553'
+```
+
 
 ### Further reading
 
@@ -578,4 +689,3 @@ More specific documentation and for debugging:
 - documentation/FAQ.md - An FAQ on common errors or issues that have popped up in the past
 - documentation/submission_guide.md - Documentation on officially submitting our repo to MLPerf Inference
 - documentation/calibration.md - Documentation on how we use calibration and quantization for MLPerf Inference
-
