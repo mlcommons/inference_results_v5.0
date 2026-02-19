@@ -1,8 +1,11 @@
 # MLPerf Inference v5.0 NVIDIA-Optimized Implementations
 This is a repository of NVIDIA-optimized implementations for the [MLPerf](https://mlcommons.org/en/) Inference Benchmark.
-This README is a quickstart tutorial on how to use our code as a public / external user.
+This README is a quickstart tutorial on how to use our code as a public / external user.  
+TLDR: For a quick reproduction steps of the benchmark, please skip to [Quick repro steps](#quick-repro-steps).
 
 ---
+
+
 
 ### MLPerf Inference Policies and Terminology
 
@@ -13,27 +16,6 @@ This is a new-user guide to learn how to use NVIDIA's MLPerf Inference submissio
 - [Benchmarks and constraints for the Closed Division](https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc#411-constraints-for-the-closed-division)
 - [LoadGen Operation](https://github.com/mlcommons/inference_policies/blob/master/inference_rules.adoc#51-loadgen-operation)
 
-
-
-### Quick Start on computelab
-
-Rrequest gpu nodes on computelab
-
-- [Machines on computelab](https://confluence.nvidia.com/display/GCA/MLPerf-Inference+v5.0+Machines)
-
-`export MLPERF_SCRATCH_PATH=/path/to/scratch/space`: set mlperf scratch space
-
-`make prebuild`: builds and launch the container.
-
-`make build`: builds plugins and binaries.
-
-`make generate_engines RUN_ARGS="--benchmarks=<BENCHMARK> --scenarios=<SCENARIO>`: generates engines.
-
-`make run_harness RUN_ARGS="--benchmarks=<BENCHMARK> --scenarios=<SCENARIO>`: runs the harness to get perf results.
-
-`make run_harness RUN_ARGS="--benchmarks=<BENCHMARK> --scenarios=<SCENARIO> --test_mode=AccuracyOnly`: runs the harness to get accuracy results.
-
-Add --config_ver=high_accuracy to run with high accuracy target.
 
 ### NVIDIA's Submission
 
@@ -61,8 +43,6 @@ If you're already a non-root user, simply don't use sudo for any command that is
 Make sure that your user is in docker group already. If you get permission issue when running docker commands, please add the user to docker group with `sudo usermod -a -G docker $USER`.
 
 ### Software Dependencies
-
-### Datacenter systems
 
 Our submission uses Docker to set up the environment. Requirements are:
 
@@ -579,3 +559,41 @@ More specific documentation and for debugging:
 - documentation/submission_guide.md - Documentation on officially submitting our repo to MLPerf Inference
 - documentation/calibration.md - Documentation on how we use calibration and quantization for MLPerf Inference
 
+
+### Quick repro steps
+1. From `repo_root/closed/NVIDIA`, run 
+```bash
+make prebuild
+```
+
+2. To build thrid party software dependancies:
+```bash
+make build
+```
+Optionally, for triton harnesses:
+```bash
+make clone_triton && make build_triton
+```
+
+3. To build inference engines (taking `llama2-70b` as an example): 
+```bash
+make generate_engines RUN_ARGS="--benchmarks=llama2-70b --scenarios=Offline,Server"
+```
+
+4. To run the benchmark:
+```bash
+make run_harness RUN_ARGS="--benchmarks=llama2-70b --scenarios=Offline,Server --test_mode=PerformanceOnly" # Performance run
+make run_harness RUN_ARGS="--benchmarks=llama2-70b --scenarios=Offline,Server --test_mode=AccuracyOnly" # Accuracy run
+```
+
+5. To run compliance tests:
+```bash
+make run_audit_harness RUN_ARGS="--benchmarks=llama2-70b --scenarios=Offline,Server"
+```
+
+#### More info:
+- [documentation/performance_tuning_guide.md](documentation/performance_tuning_guide.md) - Documentation related to tuning and benchmarks via configuration changes
+- [documentation/commands.md](documentation/commands.md) - Documentation on commonly used Make targets and RUN_ARGS options
+- [documentation/FAQ.md](documentation/FAQ.md) - An FAQ on common errors or issues that have popped up in the past
+- [documentation/submission_guide.md](documentation/submission_guide.md) - Documentation on officially submitting our repo to MLPerf Inference
+- [documentation/calibration.md](documentation/calibration.md) - Documentation on how we use calibration and quantization for MLPerf Inference
